@@ -122,12 +122,10 @@ def traduire_en_anglais(texte):
 
 
 def generer_hash(texte):
-    """Génère un hash unique pour un texte."""
     return hashlib.md5(texte.strip().lower().encode("utf-8")).hexdigest()
 
 
 def chercher_cache(texte):
-    """Cherche si le texte a déjà été analysé."""
     try:
         client = get_mongo()
         db = client["factchecker"]
@@ -135,15 +133,17 @@ def chercher_cache(texte):
         cache = db["cache"].find_one({"hash": hash_texte}, {"_id": 0})
         client.close()
         if cache:
-            print(f"✅ Cache hit pour : {texte[:50]}")
-            return cache.get("resultat")
+            resultat = cache.get("resultat", {})
+            # Vérifie que le résultat contient tous les champs nécessaires
+            if resultat and "couleur" in resultat and "verdict" in resultat:
+                print(f"✅ Cache hit pour : {texte[:50]}")
+                return resultat
     except Exception as e:
         print(f"Erreur cache : {e}")
     return None
 
 
 def sauvegarder_cache(texte, resultat):
-    """Sauvegarde le résultat dans le cache."""
     try:
         client = get_mongo()
         db = client["factchecker"]
@@ -307,10 +307,10 @@ Réponds avec ce format JSON exact :
 
         reponse_finale = {
             "texte_original":  entree.texte,
-            "verdict":         resultat["verdict"],
-            "explication":     resultat["explication"],
+            "verdict":         resultat.get("verdict", "À vérifier"),
+            "explication":     resultat.get("explication", ""),
             "score_fiabilite": score_confiance,
-            "couleur":         resultat["couleur"],
+            "couleur":         resultat.get("couleur", "orange"),
             "langue":          langue,
             "sources":         sources,
             "sources_fc":      sources_fc,
@@ -329,10 +329,10 @@ Réponds avec ce format JSON exact :
             db["historique"].insert_one({
                 "texte":        entree.texte,
                 "utilisateur":  entree.utilisateur,
-                "verdict":      resultat["verdict"],
-                "explication":  resultat["explication"],
+                "verdict":      reponse_finale["verdict"],
+                "explication":  reponse_finale["explication"],
                 "score":        score_confiance,
-                "couleur":      resultat["couleur"],
+                "couleur":      reponse_finale["couleur"],
                 "langue":       langue,
                 "sources":      toutes_sources,
                 "nb_sources":   len(toutes_sources),
