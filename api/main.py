@@ -33,16 +33,20 @@ def accueil():
 
 @app.get("/historique")
 def get_historique():
-    client = MongoClient(MONGO_URL)
-    db = client[MONGO_DB]
-    historique = list(
-        db["historique"]
-        .find({}, {"_id": 0})
-        .sort("date", -1)
-        .limit(50)
-    )
-    client.close()
-    return historique
+    try:
+        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000)
+        db = client[MONGO_DB]
+        historique = list(
+            db["historique"]
+            .find({}, {"_id": 0})
+            .sort("date", -1)
+            .limit(50)
+        )
+        client.close()
+        return historique
+    except Exception as e:
+        print(f"MongoDB non disponible : {e}")
+        return []
 
 
 def rechercher_sources(texte, nb=3):
