@@ -123,14 +123,12 @@ texte = st.text_area(
 )
 
 if st.button("🔍 Analyser", type="primary"):
-    if not pseudo:
-        st.warning("⚠️ Connecte-toi d'abord dans la barre latérale !")
-    elif texte.strip():
+    if texte.strip():
         with st.spinner("🤖 Analyse en cours..."):
             try:
                 reponse = requests.post(
                     f"{API_URL}/verifier",
-                    json={"texte": texte, "utilisateur": pseudo},
+                    json={"texte": texte, "utilisateur": pseudo if pseudo else "anonyme"},
                     timeout=60
                 )
                 resultat = reponse.json()
@@ -186,6 +184,11 @@ if st.button("🔍 Analyser", type="primary"):
                             st.markdown(f"**{s['titre'][:50]}...**")
                             st.caption(s['extrait'][:100])
                             st.markdown(f"[Lire →]({s['url']})")
+
+                # Message pour inciter à s'inscrire
+                if not pseudo:
+                    st.divider()
+                    st.info("💡 **Crée un compte** pour sauvegarder ton historique et suivre tes analyses !")
 
             except Exception as e:
                 st.error(f"Erreur : {e}")
@@ -247,4 +250,10 @@ if pseudo:
         except Exception as e:
             st.warning(f"Erreur : {e}")
 else:
-    st.info("👈 Connecte-toi dans la barre latérale pour voir ton historique !")
+    st.header("📜 Historique")
+    st.warning("🔒 **Connecte-toi** pour accéder à ton historique personnel et suivre toutes tes analyses !")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info("✅ Sauvegarde automatique de chaque analyse")
+    with col2:
+        st.info("📊 Graphiques et statistiques personnalisées")
