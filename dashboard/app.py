@@ -18,7 +18,7 @@ st.caption("Vérifie si une information est vraie ou fausse")
 
 # ─── Test connexion API ───
 try:
-    test = requests.get(f"{API_URL}/", timeout=5)
+    test = requests.get(f"{API_URL}/", timeout=60)
     st.success("✅ API connectée")
 except:
     st.error("❌ API non accessible")
@@ -39,7 +39,7 @@ if st.button("Analyser", type="primary"):
             reponse = requests.post(
                 f"{API_URL}/verifier",
                 json={"texte": texte},
-                timeout=30
+                timeout=60
             )
             resultat = reponse.json()
 
@@ -66,7 +66,7 @@ st.divider()
 st.header("📜 Historique des vérifications")
 
 try:
-    historique = requests.get(f"{API_URL}/historique", timeout=5).json()
+    historique = requests.get(f"{API_URL}/historique", timeout=60).json()
 
     if historique:
         col1, col2, col3 = st.columns(3)
