@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import re
+import bcrypt
 from datetime import datetime
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -22,9 +23,69 @@ class TexteEntrant(BaseModel):
     utilisateur: str = "anonyme"
 
 
+class Utilisateur(BaseModel):
+    pseudo: str
+    mot_de_passe: str
+
+
 @app.get("/")
 def accueil():
     return {"message": "FactChecker API en ligne ✅"}
+
+
+@app.post("/inscription")
+def inscription(user: Utilisateur):
+    try:
+        from pymongo import MongoClient
+        MONGO_URL = os.environ.get("MONGO_URL", "")
+        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000, tlsInsecure=True)
+        db = client["factchecker"]
+
+        if db["utilisateurs"].find_one({"pseudo": user.pseudo}):
+            client.close()
+            return {"succes": False, "message": "Ce pseudo est déjà pris"}
+
+        mot_de_passe_hash = bcrypt.hashpw(
+            user.mot_de_passe.encode("utf-8"),
+            bcrypt.gensalt()
+        ).decode("utf-8")
+
+        db["utilisateurs"].insert_one({
+            "pseudo":           user.pseudo,
+            "mot_de_passe":     mot_de_passe_hash,
+            "date_inscription": datetime.now().isoformat()
+        })
+        client.close()
+        return {"succes": True, "message": f"Compte créé pour {user.pseudo} !"}
+
+    except Exception as e:
+        return {"succes": False, "message": str(e)}
+
+
+@app.post("/connexion")
+def connexion(user: Utilisateur):
+    try:
+        from pymongo import MongoClient
+        MONGO_URL = os.environ.get("MONGO_URL", "")
+        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000, tlsInsecure=True)
+        db = client["factchecker"]
+
+        utilisateur = db["utilisateurs"].find_one({"pseudo": user.pseudo})
+        client.close()
+
+        if not utilisateur:
+            return {"succes": False, "message": "Pseudo introuvable"}
+
+        if bcrypt.checkpw(
+            user.mot_de_passe.encode("utf-8"),
+            utilisateur["mot_de_passe"].encode("utf-8")
+        ):
+            return {"succes": True, "message": f"Bienvenue {user.pseudo} !"}
+        else:
+            return {"succes": False, "message": "Mot de passe incorrect"}
+
+    except Exception as e:
+        return {"succes": False, "message": str(e)}
 
 
 @app.get("/historique")
@@ -95,7 +156,6 @@ Réponds avec ce format JSON exact :
         match = re.search(r'\{.*\}', contenu, re.DOTALL)
         resultat = json.loads(match.group())
 
-        # Sauvegarde MongoDB optionnelle
         try:
             from pymongo import MongoClient
             MONGO_URL = os.environ.get("MONGO_URL", "")

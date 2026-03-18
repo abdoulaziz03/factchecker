@@ -50,17 +50,64 @@ with col1:
 # ─── Connexion utilisateur ───
 with st.sidebar:
     st.header("👤 Mon compte")
-    pseudo = st.text_input("Ton pseudo", placeholder="ex: alice123")
-    if pseudo:
-        st.markdown(f'<span class="user-badge">✅ {pseudo}</span>', unsafe_allow_html=True)
-        st.success("Connecté !")
+
+    if "connecte" not in st.session_state:
+        st.session_state.connecte = False
+        st.session_state.pseudo = ""
+
+    if not st.session_state.connecte:
+        onglet = st.radio("", ["🔑 Connexion", "📝 Inscription"])
+
+        pseudo = st.text_input("Pseudo")
+        mdp    = st.text_input("Mot de passe", type="password")
+
+        if onglet == "📝 Inscription":
+            if st.button("Créer mon compte"):
+                if pseudo and mdp:
+                    rep = requests.post(
+                        f"{API_URL}/inscription",
+                        json={"pseudo": pseudo, "mot_de_passe": mdp},
+                        timeout=30
+                    ).json()
+                    if rep["succes"]:
+                        st.success(rep["message"])
+                    else:
+                        st.error(rep["message"])
+                else:
+                    st.warning("Remplis tous les champs")
+
+        else:
+            if st.button("Se connecter"):
+                if pseudo and mdp:
+                    rep = requests.post(
+                        f"{API_URL}/connexion",
+                        json={"pseudo": pseudo, "mot_de_passe": mdp},
+                        timeout=30
+                    ).json()
+                    if rep["succes"]:
+                        st.session_state.connecte = True
+                        st.session_state.pseudo = pseudo
+                        st.rerun()
+                    else:
+                        st.error(rep["message"])
+                else:
+                    st.warning("Remplis tous les champs")
+
     else:
-        st.warning("Entre un pseudo pour sauvegarder ton historique")
+        st.markdown(f'<span class="user-badge">✅ {st.session_state.pseudo}</span>', unsafe_allow_html=True)
+        st.success("Connecté !")
+        if st.button("🚪 Se déconnecter"):
+            st.session_state.connecte = False
+            st.session_state.pseudo = ""
+            st.rerun()
 
     st.divider()
     st.markdown("**🔗 Liens utiles**")
     st.markdown("- [API Docs](https://factchecker-production-310f.up.railway.app/docs)")
     st.markdown("- [GitHub](https://github.com/abdoulaziz03/factchecker)")
+
+# Remplace pseudo par st.session_state.pseudo partout dans le reste du code
+pseudo = st.session_state.get("pseudo", "")
 
 # ─── Test connexion API ───
 try:
