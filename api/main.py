@@ -99,21 +99,23 @@ Réponds avec ce format JSON exact :
         match = re.search(r'\{.*\}', contenu, re.DOTALL)
         resultat = json.loads(match.group())
 
-        # Sauvegarde dans MongoDB
-        client_mongo = MongoClient(MONGO_URL)
-        db = client_mongo[MONGO_DB]
-        db["historique"].insert_one({
-            "texte":       entree.texte,
-            "verdict":     resultat["verdict"],
-            "explication": resultat["explication"],
-            "score":       float(resultat["score"]),
-            "couleur":     resultat["couleur"],
-            "sources":     sources,
-            "date":        datetime.now().isoformat()
-        })
-        client_mongo.close()
-
-        return {
+       # Sauvegarde dans MongoDB (optionnelle, ne bloque pas le résultat)
+        try:
+            client_mongo = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000)
+            db = client_mongo[MONGO_DB]
+            db["historique"].insert_one({
+                "texte":       entree.texte,
+                "verdict":     resultat["verdict"],
+                "explication": resultat["explication"],
+                "score":       float(resultat["score"]),
+                "couleur":     resultat["couleur"],
+                "sources":     sources,
+                "date":        datetime.now().isoformat()
+            })
+            client_mongo.close()
+        except Exception as mongo_err:
+            print(f"MongoDB non disponible : {mongo_err}")
+            return {
             "texte_original":  entree.texte,
             "verdict":         resultat["verdict"],
             "explication":     resultat["explication"],
