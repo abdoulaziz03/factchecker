@@ -19,6 +19,7 @@ app = FastAPI(title="FactChecker API", version="4.0.0")
 
 class TexteEntrant(BaseModel):
     texte: str
+    utilisateur: str = "anonyme"
 
 
 @app.get("/")
@@ -27,13 +28,14 @@ def accueil():
 
 
 @app.get("/historique")
-def get_historique():
+def get_historique(utilisateur: str = None):
     try:
         from pymongo import MongoClient
         MONGO_URL = os.environ.get("MONGO_URL", "")
         client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000, tlsInsecure=True)
         db = client["factchecker"]
-        historique = list(db["historique"].find({}, {"_id": 0}).sort("date", -1).limit(50))
+        filtre = {"utilisateur": utilisateur} if utilisateur else {}
+        historique = list(db["historique"].find(filtre, {"_id": 0}).sort("date", -1).limit(50))
         client.close()
         return historique
     except Exception as e:
@@ -100,13 +102,14 @@ Réponds avec ce format JSON exact :
             client_mongo = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000, tlsInsecure=True)
             db = client_mongo["factchecker"]
             db["historique"].insert_one({
-                "texte":       entree.texte,
-                "verdict":     resultat["verdict"],
-                "explication": resultat["explication"],
-                "score":       float(resultat["score"]),
-                "couleur":     resultat["couleur"],
-                "sources":     sources,
-                "date":        datetime.now().isoformat()
+                "texte":        entree.texte,
+                "utilisateur":  entree.utilisateur,
+                "verdict":      resultat["verdict"],
+                "explication":  resultat["explication"],
+                "score":        float(resultat["score"]),
+                "couleur":      resultat["couleur"],
+                "sources":      sources,
+                "date":         datetime.now().isoformat()
             })
             client_mongo.close()
         except Exception as mongo_err:
