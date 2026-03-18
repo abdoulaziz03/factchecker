@@ -57,39 +57,44 @@ with st.sidebar:
 
     if not st.session_state.connecte:
         onglet = st.radio("", ["🔑 Connexion", "📝 Inscription"])
-
         pseudo = st.text_input("Pseudo")
         mdp    = st.text_input("Mot de passe", type="password")
 
         if onglet == "📝 Inscription":
             if st.button("Créer mon compte"):
                 if pseudo and mdp:
-                    rep = requests.post(
-                        f"{API_URL}/inscription",
-                        json={"pseudo": pseudo, "mot_de_passe": mdp},
-                        timeout=30
-                    ).json()
-                    if rep["succes"]:
-                        st.success(rep["message"])
-                    else:
-                        st.error(rep["message"])
+                    try:
+                        rep = requests.post(
+                            f"{API_URL}/inscription",
+                            json={"pseudo": pseudo, "mot_de_passe": mdp},
+                            timeout=30
+                        ).json()
+                        if rep.get("succes"):
+                            st.success(rep.get("message", "Compte créé !"))
+                        else:
+                            st.error(rep.get("message", "Erreur inconnue"))
+                    except Exception as e:
+                        st.error(f"Erreur : {e}")
                 else:
                     st.warning("Remplis tous les champs")
 
         else:
             if st.button("Se connecter"):
                 if pseudo and mdp:
-                    rep = requests.post(
-                        f"{API_URL}/connexion",
-                        json={"pseudo": pseudo, "mot_de_passe": mdp},
-                        timeout=30
-                    ).json()
-                    if rep["succes"]:
-                        st.session_state.connecte = True
-                        st.session_state.pseudo = pseudo
-                        st.rerun()
-                    else:
-                        st.error(rep["message"])
+                    try:
+                        rep = requests.post(
+                            f"{API_URL}/connexion",
+                            json={"pseudo": pseudo, "mot_de_passe": mdp},
+                            timeout=30
+                        ).json()
+                        if rep.get("succes"):
+                            st.session_state.connecte = True
+                            st.session_state.pseudo = pseudo
+                            st.rerun()
+                        else:
+                            st.error(rep.get("message", "Erreur inconnue"))
+                    except Exception as e:
+                        st.error(f"Erreur : {e}")
                 else:
                     st.warning("Remplis tous les champs")
 
@@ -106,9 +111,7 @@ with st.sidebar:
     st.markdown("- [API Docs](https://factchecker-production-310f.up.railway.app/docs)")
     st.markdown("- [GitHub](https://github.com/abdoulaziz03/factchecker)")
 
-# Remplace pseudo par st.session_state.pseudo partout dans le reste du code
 pseudo = st.session_state.get("pseudo", "")
-
 
 # ─── Vérification ───
 st.header("🔎 Vérifier une information")
@@ -121,41 +124,42 @@ texte = st.text_area(
 
 if st.button("🔍 Analyser", type="primary"):
     if not pseudo:
-        st.warning("⚠️ Entre d'abord un pseudo dans la barre latérale !")
+        st.warning("⚠️ Connecte-toi d'abord dans la barre latérale !")
     elif texte.strip():
         with st.spinner("🤖 Analyse en cours..."):
-            reponse = requests.post(
-                f"{API_URL}/verifier",
-                json={"texte": texte, "utilisateur": pseudo},
-                timeout=60
-            )
-            resultat = reponse.json()
+            try:
+                reponse = requests.post(
+                    f"{API_URL}/verifier",
+                    json={"texte": texte, "utilisateur": pseudo},
+                    timeout=60
+                )
+                resultat = reponse.json()
 
-            # Affichage verdict
-            couleur_map = {"vert": "success", "orange": "warning", "rouge": "error"}
-            niveau = couleur_map.get(resultat["couleur"], "info")
-            getattr(st, niveau)(f"**Verdict : {resultat['verdict']}**")
+                couleur_map = {"vert": "success", "orange": "warning", "rouge": "error"}
+                niveau = couleur_map.get(resultat["couleur"], "info")
+                getattr(st, niveau)(f"**Verdict : {resultat['verdict']}**")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                score = resultat["score_fiabilite"] * 100
-                st.metric("Score de fiabilité", f"{score:.0f}%")
-            with col2:
-                emoji = "✅" if resultat["couleur"] == "vert" else "⚠️" if resultat["couleur"] == "orange" else "🔴"
-                st.metric("Statut", f"{emoji} {resultat['verdict']}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    score = resultat["score_fiabilite"] * 100
+                    st.metric("Score de fiabilité", f"{score:.0f}%")
+                with col2:
+                    emoji = "✅" if resultat["couleur"] == "vert" else "⚠️" if resultat["couleur"] == "orange" else "🔴"
+                    st.metric("Statut", f"{emoji} {resultat['verdict']}")
 
-            st.info(f"💬 {resultat['explication']}")
+                st.info(f"💬 {resultat['explication']}")
 
-            # Sources
-            sources = resultat.get("sources", [])
-            if sources:
-                st.subheader("🔗 Sources trouvées sur le web")
-                cols = st.columns(len(sources))
-                for i, s in enumerate(sources):
-                    with cols[i]:
-                        st.markdown(f"**{s['titre'][:50]}...**")
-                        st.caption(s['extrait'][:100])
-                        st.markdown(f"[Lire l'article →]({s['url']})")
+                sources = resultat.get("sources", [])
+                if sources:
+                    st.subheader("🔗 Sources trouvées sur le web")
+                    cols = st.columns(len(sources))
+                    for i, s in enumerate(sources):
+                        with cols[i]:
+                            st.markdown(f"**{s['titre'][:50]}...**")
+                            st.caption(s['extrait'][:100])
+                            st.markdown(f"[Lire l'article →]({s['url']})")
+            except Exception as e:
+                st.error(f"Erreur : {e}")
     else:
         st.warning("Merci d'entrer un texte à analyser.")
 
@@ -174,7 +178,7 @@ if pseudo:
 
             if historique:
                 col1, col2, col3 = st.columns(3)
-                total  = len(historique)
+                total   = len(historique)
                 fiables = sum(1 for h in historique if h["verdict"] == "Fiable")
                 faux    = sum(1 for h in historique if h["verdict"] == "Probablement faux")
 
@@ -182,7 +186,6 @@ if pseudo:
                 col2.metric("✅ Fiables", fiables)
                 col3.metric("🔴 Probablement faux", faux)
 
-                # Graphique
                 verdicts = pd.DataFrame(historique)["verdict"].value_counts()
                 st.bar_chart(verdicts)
 
@@ -215,4 +218,4 @@ if pseudo:
         except Exception as e:
             st.warning(f"Erreur : {e}")
 else:
-    st.info("👈 Entre un pseudo dans la barre latérale pour voir ton historique !")
+    st.info("👈 Connecte-toi dans la barre latérale pour voir ton historique !")
