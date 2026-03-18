@@ -139,25 +139,44 @@ if st.button("🔍 Analyser", type="primary"):
                 niveau = couleur_map.get(resultat["couleur"], "info")
                 getattr(st, niveau)(f"**Verdict : {resultat['verdict']}**")
 
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 with col1:
                     score = resultat["score_fiabilite"] * 100
                     st.metric("Score de fiabilité", f"{score:.0f}%")
                 with col2:
                     emoji = "✅" if resultat["couleur"] == "vert" else "⚠️" if resultat["couleur"] == "orange" else "🔴"
                     st.metric("Statut", f"{emoji} {resultat['verdict']}")
+                with col3:
+                    st.metric("Sources analysées", resultat.get("nb_sources", 0))
 
                 st.info(f"💬 {resultat['explication']}")
 
+                # Langue détectée
+                langue = resultat.get("langue", "fr")
+                flag = "🇫🇷" if langue == "fr" else "🇬🇧" if langue == "en" else "🌍"
+                st.caption(f"{flag} Langue détectée : **{langue}** | 📊 {resultat.get('nb_sources', 0)} sources analysées")
+
+                # Sources fact-checkers
+                sources_fc = resultat.get("sources_fc", [])
+                if sources_fc:
+                    st.subheader("✅ Sources Fact-Checkers officiels")
+                    for s in sources_fc:
+                        st.markdown(f"🔎 **{s['titre']}**")
+                        st.caption(s['extrait'][:150])
+                        st.markdown(f"[Voir sur {s['url'][:40]}...]({s['url']})")
+                        st.divider()
+
+                # Sources générales
                 sources = resultat.get("sources", [])
                 if sources:
-                    st.subheader("🔗 Sources trouvées sur le web")
-                    cols = st.columns(len(sources))
-                    for i, s in enumerate(sources):
+                    st.subheader("🔗 Sources web")
+                    cols = st.columns(min(len(sources), 3))
+                    for i, s in enumerate(sources[:3]):
                         with cols[i]:
                             st.markdown(f"**{s['titre'][:50]}...**")
                             st.caption(s['extrait'][:100])
-                            st.markdown(f"[Lire l'article →]({s['url']})")
+                            st.markdown(f"[Lire →]({s['url']})")
+
             except Exception as e:
                 st.error(f"Erreur : {e}")
     else:
