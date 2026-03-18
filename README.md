@@ -24,13 +24,13 @@
 ## 📸 Aperçu
 
 ### Dashboard
-![Dashboard](image/dashboard1.png)
+![Dashboard](images/dashboard1.png)
 
 ### Pipeline Airflow
-![Airflow](image/airflow.png)
+![Airflow](images/airflow.png)
 
 ### Base de données MongoDB
-![MongoDB](image/mongodb.png)
+![MongoDB](images/mongodb.png)
 
 ---
 
