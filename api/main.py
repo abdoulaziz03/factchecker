@@ -28,7 +28,17 @@ def accueil():
 
 @app.get("/historique")
 def get_historique():
-    return []
+    try:
+        from pymongo import MongoClient
+        MONGO_URL = os.environ.get("MONGO_URL", "")
+        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000, tlsInsecure=True)
+        db = client["factchecker"]
+        historique = list(db["historique"].find({}, {"_id": 0}).sort("date", -1).limit(50))
+        client.close()
+        return historique
+    except Exception as e:
+        print(f"MongoDB : {e}")
+        return []
 
 
 def rechercher_sources(texte, nb=3):
@@ -82,6 +92,25 @@ Réponds avec ce format JSON exact :
         contenu = reponse.choices[0].message.content
         match = re.search(r'\{.*\}', contenu, re.DOTALL)
         resultat = json.loads(match.group())
+
+        # Sauvegarde MongoDB optionnelle
+        try:
+            from pymongo import MongoClient
+            MONGO_URL = os.environ.get("MONGO_URL", "")
+            client_mongo = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000, tlsInsecure=True)
+            db = client_mongo["factchecker"]
+            db["historique"].insert_one({
+                "texte":       entree.texte,
+                "verdict":     resultat["verdict"],
+                "explication": resultat["explication"],
+                "score":       float(resultat["score"]),
+                "couleur":     resultat["couleur"],
+                "sources":     sources,
+                "date":        datetime.now().isoformat()
+            })
+            client_mongo.close()
+        except Exception as mongo_err:
+            print(f"MongoDB : {mongo_err}")
 
         return {
             "texte_original":  entree.texte,
