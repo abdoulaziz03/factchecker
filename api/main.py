@@ -105,7 +105,6 @@ def get_historique(utilisateur: str = None):
 
 
 def detecter_langue(texte):
-    """Détecte la langue du texte."""
     try:
         return detect(texte)
     except:
@@ -113,7 +112,6 @@ def detecter_langue(texte):
 
 
 def traduire_en_anglais(texte):
-    """Traduit le texte en anglais si nécessaire."""
     try:
         if GoogleTranslator:
             return GoogleTranslator(source="auto", target="en").translate(texte)
@@ -122,15 +120,15 @@ def traduire_en_anglais(texte):
     return texte
 
 
-def rechercher_sources(texte, nb=5):
-    """Recherche des articles via DuckDuckGo."""
+def rechercher_sources(texte, nb=4):
     try:
         with DDGS() as ddgs:
             resultats = list(ddgs.text(texte, max_results=nb))
         return [{
             "titre":   r.get("title", ""),
             "url":     r.get("href", ""),
-            "extrait": r.get("body", "")[:300]
+            "extrait": r.get("body", "")[:300],
+            "type":    "web"
         } for r in resultats]
     except Exception as e:
         print(f"Erreur recherche web : {e}")
@@ -138,14 +136,13 @@ def rechercher_sources(texte, nb=5):
 
 
 def rechercher_fact_checkers(texte_anglais):
-    """Recherche sur des sites de fact-checking connus."""
     sources_fc = []
     sites = [
         "site:snopes.com",
         "site:factcheck.org",
-        "site:afp.com/fr/agence/sections-afp/factuel",
-        "site:lemonde.fr/les-decodeurs",
-        "site:liberation.fr/checknews"
+        "site:afp.com factuel",
+        "site:lemonde.fr decodeurs",
+        "site:liberation.fr checknews"
     ]
     try:
         with DDGS() as ddgs:
@@ -163,20 +160,30 @@ def rechercher_fact_checkers(texte_anglais):
     return sources_fc
 
 
+def rechercher_wikipedia(texte_anglais):
+    sources_wiki = []
+    try:
+        with DDGS() as ddgs:
+            resultats = list(ddgs.text(f"{texte_anglais} site:wikipedia.org", max_results=2))
+            for r in resultats:
+                sources_wiki.append({
+                    "titre":   r.get("title", ""),
+                    "url":     r.get("href", ""),
+                    "extrait": r.get("body", "")[:300],
+                    "type":    "wikipedia"
+                })
+    except Exception as e:
+        print(f"Erreur Wikipedia : {e}")
+    return sources_wiki
+
+
 def calculer_score_confiance(sources, verdict):
-    """
-    Calcule un score de confiance basé sur :
-    - Le nombre de sources trouvées
-    - La présence de sites fact-checkers reconnus
-    - La cohérence du verdict
-    """
     score_base = {
         "Fiable": 0.75,
         "À vérifier": 0.50,
         "Probablement faux": 0.20
     }.get(verdict, 0.50)
 
-    # Bonus selon le nombre de sources
     nb_sources = len(sources)
     if nb_sources >= 4:
         bonus_sources = 0.10
@@ -185,39 +192,46 @@ def calculer_score_confiance(sources, verdict):
     else:
         bonus_sources = 0.0
 
-    # Bonus si sources fact-checkers présentes
-    fc_sites = ["snopes", "factcheck", "afp", "decodeurs", "checknews", "lemonde", "liberation"]
+    fc_sites = ["snopes", "factcheck", "afp", "decodeurs", "checknews", "lemonde", "liberation", "wikipedia"]
     nb_fc = sum(1 for s in sources if any(fc in s.get("url", "").lower() for fc in fc_sites))
     bonus_fc = min(nb_fc * 0.05, 0.15)
 
-    score_final = min(score_base + bonus_sources + bonus_fc, 0.99)
-    return round(score_final, 2)
+    return round(min(score_base + bonus_sources + bonus_fc, 0.99), 2)
 
 
 @app.post("/verifier")
 def verifier_information(entree: TexteEntrant):
     try:
-        # Détection de la langue
+        # Détection langue et traduction
         langue = detecter_langue(entree.texte)
         texte_anglais = traduire_en_anglais(entree.texte) if langue != "en" else entree.texte
 
-        # Recherche sources générales + fact-checkers
-        sources          = rechercher_sources(entree.texte, nb=4)
-        sources_fc       = rechercher_fact_checkers(texte_anglais)
-        toutes_sources   = sources + sources_fc
+        # Recherche toutes sources
+        sources        = rechercher_sources(entree.texte, nb=4)
+        sources_fc     = rechercher_fact_checkers(texte_anglais)
+        sources_wiki   = rechercher_wikipedia(texte_anglais)
+        toutes_sources = sources + sources_fc + sources_wiki
 
         contexte_sources = "\n".join(
             [f"- [{s.get('type','web')}] {s['titre']} : {s['extrait']}" for s in toutes_sources]
         ) if toutes_sources else "Aucune source trouvée."
 
-        prompt = f"""Tu es un expert en fact-checking international. Analyse cette affirmation en tenant compte des sources trouvées.
+        prompt = f"""Tu es un expert en fact-checking international rigoureux et objectif.
+Analyse cette affirmation en tenant compte des sources trouvées sur le web.
 Réponds UNIQUEMENT en JSON valide, sans texte avant ou après.
 
 Affirmation : "{entree.texte}"
 Langue détectée : {langue}
 
-Sources trouvées (web + fact-checkers) :
+Sources trouvées (web + fact-checkers + Wikipedia) :
 {contexte_sources}
+
+Règles importantes :
+- Pour les faits politiques (présidents, dirigeants, chefs d'état) : fie-toi aux sources web. Si elles confirment → "Fiable"
+- Pour les théories du complot ou affirmations scientifiquement fausses → "Probablement faux"
+- Si les sources sont contradictoires ou insuffisantes → "À vérifier"
+- Ne dis jamais "Probablement faux" si les sources confirment l'affirmation
+- Cite toujours une source précise dans ton explication
 
 Réponds avec ce format JSON exact :
 {{
@@ -239,7 +253,6 @@ Réponds avec ce format JSON exact :
         match   = re.search(r'\{.*\}', contenu, re.DOTALL)
         resultat = json.loads(match.group())
 
-        # Score de confiance précis
         score_confiance = calculer_score_confiance(toutes_sources, resultat["verdict"])
 
         # Sauvegarde MongoDB
@@ -247,17 +260,17 @@ Réponds avec ce format JSON exact :
             client = get_mongo()
             db = client["factchecker"]
             db["historique"].insert_one({
-                "texte":          entree.texte,
-                "utilisateur":    entree.utilisateur,
-                "verdict":        resultat["verdict"],
-                "explication":    resultat["explication"],
-                "score":          score_confiance,
-                "couleur":        resultat["couleur"],
-                "langue":         langue,
-                "sources":        toutes_sources,
-                "nb_sources":     len(toutes_sources),
-                "nb_fc":          len(sources_fc),
-                "date":           datetime.now().isoformat()
+                "texte":        entree.texte,
+                "utilisateur":  entree.utilisateur,
+                "verdict":      resultat["verdict"],
+                "explication":  resultat["explication"],
+                "score":        score_confiance,
+                "couleur":      resultat["couleur"],
+                "langue":       langue,
+                "sources":      toutes_sources,
+                "nb_sources":   len(toutes_sources),
+                "nb_fc":        len(sources_fc),
+                "date":         datetime.now().isoformat()
             })
             client.close()
         except Exception as mongo_err:
@@ -272,6 +285,7 @@ Réponds avec ce format JSON exact :
             "langue":          langue,
             "sources":         sources,
             "sources_fc":      sources_fc,
+            "sources_wiki":    sources_wiki,
             "nb_sources":      len(toutes_sources)
         }
 
@@ -286,6 +300,7 @@ Réponds avec ce format JSON exact :
             "langue":          "fr",
             "sources":         [],
             "sources_fc":      [],
+            "sources_wiki":    [],
             "nb_sources":      0
         }
 

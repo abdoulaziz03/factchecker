@@ -166,6 +166,16 @@ if st.button("🔍 Analyser", type="primary"):
                         st.markdown(f"[Voir sur {s['url'][:40]}...]({s['url']})")
                         st.divider()
 
+                # Sources Wikipedia
+                sources_wiki = resultat.get("sources_wiki", [])
+                if sources_wiki:
+                    st.subheader("📖 Sources Wikipedia")
+                    for s in sources_wiki:
+                        st.markdown(f"📖 **{s['titre']}**")
+                        st.caption(s['extrait'][:150])
+                        st.markdown(f"[Voir sur Wikipedia]({s['url']})")
+                        st.divider()
+
                 # Sources générales
                 sources = resultat.get("sources", [])
                 if sources:
