@@ -6,16 +6,11 @@ from datetime import datetime
 from fastapi import FastAPI
 from pydantic import BaseModel
 from groq import Groq
-from pymongo import MongoClient
 from ddgs import DDGS
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.join(BASE_DIR, "config"))
-
-from settings import MONGO_URL, MONGO_DB
-
 from dotenv import load_dotenv
+
 load_dotenv()
+
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 client_groq = Groq(api_key=GROQ_API_KEY)
 
@@ -33,32 +28,18 @@ def accueil():
 
 @app.get("/historique")
 def get_historique():
-    try:
-        client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000)
-        db = client[MONGO_DB]
-        historique = list(
-            db["historique"]
-            .find({}, {"_id": 0})
-            .sort("date", -1)
-            .limit(50)
-        )
-        client.close()
-        return historique
-    except Exception as e:
-        print(f"MongoDB non disponible : {e}")
-        return []
+    return []
 
 
 def rechercher_sources(texte, nb=3):
-    """Recherche des articles liés à l'affirmation via DuckDuckGo."""
     try:
         with DDGS() as ddgs:
             resultats = list(ddgs.text(texte, max_results=nb))
         sources = []
         for r in resultats:
             sources.append({
-                "titre": r.get("title", ""),
-                "url":   r.get("href", ""),
+                "titre":   r.get("title", ""),
+                "url":     r.get("href", ""),
                 "extrait": r.get("body", "")[:200]
             })
         return sources
@@ -70,7 +51,6 @@ def rechercher_sources(texte, nb=3):
 @app.post("/verifier")
 def verifier_information(entree: TexteEntrant):
     try:
-        # Recherche de sources en parallèle
         sources = rechercher_sources(entree.texte)
         contexte_sources = "\n".join(
             [f"- {s['titre']} : {s['extrait']}" for s in sources]
@@ -103,23 +83,7 @@ Réponds avec ce format JSON exact :
         match = re.search(r'\{.*\}', contenu, re.DOTALL)
         resultat = json.loads(match.group())
 
-       # Sauvegarde dans MongoDB (optionnelle, ne bloque pas le résultat)
-        try:
-            client_mongo = MongoClient(MONGO_URL, serverSelectionTimeoutMS=3000)
-            db = client_mongo[MONGO_DB]
-            db["historique"].insert_one({
-                "texte":       entree.texte,
-                "verdict":     resultat["verdict"],
-                "explication": resultat["explication"],
-                "score":       float(resultat["score"]),
-                "couleur":     resultat["couleur"],
-                "sources":     sources,
-                "date":        datetime.now().isoformat()
-            })
-            client_mongo.close()
-        except Exception as mongo_err:
-            print(f"MongoDB non disponible : {mongo_err}")
-            return {
+        return {
             "texte_original":  entree.texte,
             "verdict":         resultat["verdict"],
             "explication":     resultat["explication"],
