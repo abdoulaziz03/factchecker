@@ -1,17 +1,16 @@
-# --- MongoDB ---
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
-
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb+srv://carinebasset490_db_user:mmBcmdnFtTf8dbrL@cluster0.aidiodt.mongodb.net/")
-MONGO_DB = os.environ.get("MONGO_DB", "factchecker_db")
+# --- MongoDB ---
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+MONGO_DB  = os.environ.get("MONGO_DB", "factchecker")
 COLLECTION_RAW   = "posts_bruts"
 COLLECTION_CLEAN = "posts_propres"
 
 # --- Bluesky API ---
-BLUESKY_USERNAME = "azizshamark.bsky.social"
-BLUESKY_PASSWORD = "bpvd-bwfs-3g6k-pj7i"
+BLUESKY_USERNAME = os.environ.get("BLUESKY_USERNAME", "")
+BLUESKY_PASSWORD = os.environ.get("BLUESKY_PASSWORD", "")
 
 # --- Mots-clés à surveiller ---
 KEYWORDS = [
@@ -23,7 +22,7 @@ KEYWORDS = [
 ]
 
 # --- Machine Learning ---
-NB_CLUSTERS = 3
+NB_CLUSTERS  = 3
 MAX_FEATURES = 5000
 
 # --- API ---

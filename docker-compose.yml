@@ -2,7 +2,7 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:2.8.1
+  build: .
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -10,8 +10,9 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__WEBSERVER__SECRET_KEY: 'factchecker_secret_key_2026'
-    _PIP_ADDITIONAL_REQUIREMENTS: 'atproto pymongo scikit-learn pandas joblib duckduckgo-search==3.9.3 groq'
-    MONGO_URL: 'mongodb://host.docker.internal:27017'
+    MONGO_URL: 'mongodb://192.168.96.1:27017'    
+    BLUESKY_USERNAME: 'azizshamark.bsky.social'
+    BLUESKY_PASSWORD: 'bpvd-bwfs-3g6k-pj7i'
   volumes:
     - ./dags:/opt/airflow/dags
     - ./collecte:/opt/airflow/collecte
