@@ -109,13 +109,6 @@ with st.sidebar:
 # Remplace pseudo par st.session_state.pseudo partout dans le reste du code
 pseudo = st.session_state.get("pseudo", "")
 
-# ─── Test connexion API ───
-try:
-    test = requests.get(f"{API_URL}/", timeout=60)
-    st.success("✅ API connectée")
-except:
-    st.error("❌ API non accessible")
-    st.stop()
 
 # ─── Vérification ───
 st.header("🔎 Vérifier une information")
