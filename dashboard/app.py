@@ -106,10 +106,6 @@ with st.sidebar:
             st.session_state.pseudo = ""
             st.rerun()
 
-    st.divider()
-    st.markdown("**🔗 Liens utiles**")
-    st.markdown("- [API Docs](https://factchecker-production-310f.up.railway.app/docs)")
-    st.markdown("- [GitHub](https://github.com/abdoulaziz03/factchecker)")
 
 pseudo = st.session_state.get("pseudo", "")
 
