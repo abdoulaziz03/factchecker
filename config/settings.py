@@ -5,6 +5,7 @@ load_dotenv()
 
 
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb+srv://carinebasset490_db_user:mmBcmdnFtTf8dbrL@cluster0.aidiodt.mongodb.net/")
+MONGO_DB = os.environ.get("MONGO_DB", "factchecker_db")
 COLLECTION_RAW   = "posts_bruts"
 COLLECTION_CLEAN = "posts_propres"
 
