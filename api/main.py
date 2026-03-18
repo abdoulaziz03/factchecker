@@ -3,6 +3,7 @@ import sys
 import json
 import re
 import bcrypt
+import hashlib
 from datetime import datetime
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -120,6 +121,48 @@ def traduire_en_anglais(texte):
     return texte
 
 
+def generer_hash(texte):
+    """Génère un hash unique pour un texte."""
+    return hashlib.md5(texte.strip().lower().encode("utf-8")).hexdigest()
+
+
+def chercher_cache(texte):
+    """Cherche si le texte a déjà été analysé."""
+    try:
+        client = get_mongo()
+        db = client["factchecker"]
+        hash_texte = generer_hash(texte)
+        cache = db["cache"].find_one({"hash": hash_texte}, {"_id": 0})
+        client.close()
+        if cache:
+            print(f"✅ Cache hit pour : {texte[:50]}")
+            return cache.get("resultat")
+    except Exception as e:
+        print(f"Erreur cache : {e}")
+    return None
+
+
+def sauvegarder_cache(texte, resultat):
+    """Sauvegarde le résultat dans le cache."""
+    try:
+        client = get_mongo()
+        db = client["factchecker"]
+        hash_texte = generer_hash(texte)
+        db["cache"].update_one(
+            {"hash": hash_texte},
+            {"$set": {
+                "hash":     hash_texte,
+                "texte":    texte,
+                "resultat": resultat,
+                "date":     datetime.now().isoformat()
+            }},
+            upsert=True
+        )
+        client.close()
+    except Exception as e:
+        print(f"Erreur sauvegarde cache : {e}")
+
+
 def rechercher_sources(texte, nb=4):
     try:
         with DDGS() as ddgs:
@@ -202,6 +245,13 @@ def calculer_score_confiance(sources, verdict):
 @app.post("/verifier")
 def verifier_information(entree: TexteEntrant):
     try:
+        # Vérification du cache
+        cache = chercher_cache(entree.texte)
+        if cache:
+            cache["texte_original"] = entree.texte
+            cache["depuis_cache"] = True
+            return cache
+
         # Détection langue et traduction
         langue = detecter_langue(entree.texte)
         texte_anglais = traduire_en_anglais(entree.texte) if langue != "en" else entree.texte
@@ -249,13 +299,30 @@ Réponds avec ce format JSON exact :
             max_tokens=400
         )
 
-        contenu = reponse.choices[0].message.content
-        match   = re.search(r'\{.*\}', contenu, re.DOTALL)
+        contenu  = reponse.choices[0].message.content
+        match    = re.search(r'\{.*\}', contenu, re.DOTALL)
         resultat = json.loads(match.group())
 
         score_confiance = calculer_score_confiance(toutes_sources, resultat["verdict"])
 
-        # Sauvegarde MongoDB
+        reponse_finale = {
+            "texte_original":  entree.texte,
+            "verdict":         resultat["verdict"],
+            "explication":     resultat["explication"],
+            "score_fiabilite": score_confiance,
+            "couleur":         resultat["couleur"],
+            "langue":          langue,
+            "sources":         sources,
+            "sources_fc":      sources_fc,
+            "sources_wiki":    sources_wiki,
+            "nb_sources":      len(toutes_sources),
+            "depuis_cache":    False
+        }
+
+        # Sauvegarde dans le cache
+        sauvegarder_cache(entree.texte, reponse_finale)
+
+        # Sauvegarde dans l'historique MongoDB
         try:
             client = get_mongo()
             db = client["factchecker"]
@@ -276,18 +343,7 @@ Réponds avec ce format JSON exact :
         except Exception as mongo_err:
             print(f"MongoDB : {mongo_err}")
 
-        return {
-            "texte_original":  entree.texte,
-            "verdict":         resultat["verdict"],
-            "explication":     resultat["explication"],
-            "score_fiabilite": score_confiance,
-            "couleur":         resultat["couleur"],
-            "langue":          langue,
-            "sources":         sources,
-            "sources_fc":      sources_fc,
-            "sources_wiki":    sources_wiki,
-            "nb_sources":      len(toutes_sources)
-        }
+        return reponse_finale
 
     except Exception as e:
         print(f"ERREUR : {e}")
@@ -301,7 +357,8 @@ Réponds avec ce format JSON exact :
             "sources":         [],
             "sources_fc":      [],
             "sources_wiki":    [],
-            "nb_sources":      0
+            "nb_sources":      0,
+            "depuis_cache":    False
         }
 
 
