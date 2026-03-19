@@ -6,6 +6,7 @@ import bcrypt
 import hashlib
 from datetime import datetime
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
 from ddgs import DDGS
@@ -27,6 +28,14 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 client_groq = Groq(api_key=GROQ_API_KEY)
 
 app = FastAPI(title="FactChecker API", version="5.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class TexteEntrant(BaseModel):
@@ -134,7 +143,6 @@ def chercher_cache(texte):
         client.close()
         if cache:
             resultat = cache.get("resultat", {})
-            # Vérifie que le résultat contient tous les champs nécessaires
             if resultat and "couleur" in resultat and "verdict" in resultat:
                 print(f"✅ Cache hit pour : {texte[:50]}")
                 return resultat
@@ -245,18 +253,15 @@ def calculer_score_confiance(sources, verdict):
 @app.post("/verifier")
 def verifier_information(entree: TexteEntrant):
     try:
-        # Vérification du cache
         cache = chercher_cache(entree.texte)
         if cache:
             cache["texte_original"] = entree.texte
             cache["depuis_cache"] = True
             return cache
 
-        # Détection langue et traduction
         langue = detecter_langue(entree.texte)
         texte_anglais = traduire_en_anglais(entree.texte) if langue != "en" else entree.texte
 
-        # Recherche toutes sources
         sources        = rechercher_sources(entree.texte, nb=4)
         sources_fc     = rechercher_fact_checkers(texte_anglais)
         sources_wiki   = rechercher_wikipedia(texte_anglais)
@@ -319,10 +324,8 @@ Réponds avec ce format JSON exact :
             "depuis_cache":    False
         }
 
-        # Sauvegarde dans le cache
         sauvegarder_cache(entree.texte, reponse_finale)
 
-        # Sauvegarde dans l'historique MongoDB
         try:
             client = get_mongo()
             db = client["factchecker"]
