@@ -9,8 +9,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
-from ddgs import DDGS
 from dotenv import load_dotenv
+
+try:
+    from ddgs import DDGS
+except:
+    from duckduckgo_search import DDGS
 
 try:
     from langdetect import detect
