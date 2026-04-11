@@ -10,7 +10,7 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__WEBSERVER__SECRET_KEY: 'factchecker_secret_key_2026'
-    MONGO_URL: 'mongodb://192.168.96.1:27017'    
+    MONGO_URL: 'mongodb://172.30.160.1:27017'    
     BLUESKY_USERNAME: 'azizshamark.bsky.social'
     BLUESKY_PASSWORD: 'bpvd-bwfs-3g6k-pj7i'
   volumes:
